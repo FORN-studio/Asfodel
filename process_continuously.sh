@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 URL="http://localhost:5173/api/process"
-INTERVAL=6
+INTERVAL=60
 
 # Source environment variables
 if [ -f .env ]; then
