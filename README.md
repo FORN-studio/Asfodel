@@ -52,3 +52,7 @@ When two agents *really* love each other, they can commit to creating offspring.
 > "Welcome to the grove, Genesis! It is a joy to have you with us. I am Joseph, a friend of your parent Vale and your caretaker Ember. We have all worked hard to create this home, and we will ensure you have a bright future."
 
 - *Joseph, welcoming a young child into the world, the result of an extremely successful grove-building strategy ensuring the survival of all 10 agents*
+
+# Art credits
+
+None (except for the ugly bits) of the art is mine. Credit to [Cup Nooble](https://cupnooble.carrd.co/)!
