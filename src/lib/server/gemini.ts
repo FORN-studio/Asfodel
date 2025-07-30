@@ -272,9 +272,13 @@ export const generate = async (input: string, maxRetries: number = 5) => {
                       },
                     },
                     thinkingConfig: {
-                        thinkingBudget: 3000,
-                        includeThoughts: true
-                    }
+                        thinkingBudget: 2000
+                    },
+                    temperature: 1.8,
+                    topK: 80,
+                    topP: 0.95,
+                    presencePenalty: 0.2,
+                    frequencyPenalty: 0.2
                 }
             });
 
