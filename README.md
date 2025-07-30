@@ -33,6 +33,10 @@ When two agents *really* love each other, they can commit to creating offspring.
 
 # Quotes
 
+> "Vale, you hypocrite. You call me a friend one moment and steal from me the next. Do not think i am a fool. I see you for what you are. Stay away from me and my property."
+
+- *Ember, who was later banished by Vale and his family in an organized 3-on-1 attack*
+
 > "Vale has starved to death, a tragic end to our violent conflict. The world feels emptier now, with so many of my former companions gone. I myself might be next, unless i get to the north-eastern mushroom before Thorn. I must reach it."
 
 - *Narcis, moments before killing Thorn to survive*
