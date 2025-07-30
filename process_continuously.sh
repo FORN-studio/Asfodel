@@ -3,13 +3,17 @@
 URL="http://localhost:5173/api/process"
 INTERVAL=6
 
+# Source environment variables
+if [ -f .env ]; then
+  export $(cat .env | xargs)
+fi
+
 while true; do
   (
     ts=$(date -Is)
     curl -sS \
-      -X POST "$URL" \
-      -H "Content-Type: application/json" \
-      --data '{"run":true}' \
+      -X GET "$URL" \
+      -H "authorization: $CRON_SECRET" \
       --connect-timeout 5 \
       --max-time 30 \
       --fail-with-body \

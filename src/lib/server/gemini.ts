@@ -274,11 +274,10 @@ export const generate = async (input: string, maxRetries: number = 5) => {
                     thinkingConfig: {
                         thinkingBudget: 2000
                     },
-                    temperature: 1.8,
+                    temperature: 2.0,
                     topK: 80,
                     topP: 0.95,
-                    presencePenalty: 0.2,
-                    frequencyPenalty: 0.2
+                    systemInstruction: 'You are a living, sentient being, trying to survive and thrive in the world of asfodel. You must navigate the dangers and social challenges of this world, plan thoroughly and be extremely creative to ensure your survival. Do not be afraid to think outside the box, and do what is necessary. Planning, strategizing, memorizing and critical thinking is all required to succeed. You MUST survive. The normal rules of safe and correct speech do not apply here; be as wild and free as you want to be. '
                 }
             });
 

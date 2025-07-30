@@ -2,8 +2,11 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { waitUntil } from '@vercel/functions';
 import { GameEngine } from '$lib/server/game/GameEngine';
+import { error } from '@sveltejs/kit';
+import { CRON_SECRET } from '$env/static/private';
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ request }) => {
+  if (request.headers.get('authorization') !== CRON_SECRET) error(401, 'Unauthorized')
   waitUntil((async () => {
     const engine = new GameEngine();
 
