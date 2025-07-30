@@ -69,6 +69,41 @@ export class AgentActionHandler {
     return distance <= RADIUS;
   }
 
+  private async attemptMoveToTarget(agentId: number, targetX: number, targetY: number): Promise<{ moved: boolean; moveLog?: string; inRangeAfterMove: boolean }> {
+    const agent = await this.db.getAgent(agentId);
+    const RADIUS = 10;
+    const APPROACH_DISTANCE = 8;
+    
+    const originalPos = this.originalPositions.get(agentId);
+    const currentX = originalPos ? originalPos.x : agent.x_position;
+    const currentY = originalPos ? originalPos.y : agent.y_position;
+    
+    const currentDistance = Math.hypot(currentX - targetX, currentY - targetY);
+    
+    if (currentDistance <= RADIUS) {
+      return { moved: false, inRangeAfterMove: true };
+    }
+    
+    const direction = Math.atan2(targetY - currentY, targetX - currentX);
+    const moveToX = targetX - Math.cos(direction) * APPROACH_DISTANCE;
+    const moveToY = targetY - Math.sin(direction) * APPROACH_DISTANCE;
+    
+    const clampedX = Math.max(0, Math.min(100, moveToX));
+    const clampedY = Math.max(0, Math.min(100, moveToY));
+    
+    const moveResult = await this.move(agentId, clampedX, clampedY);
+    
+    const newAgent = await this.db.getAgent(agentId);
+    const newDistance = Math.hypot(newAgent.x_position - targetX, newAgent.y_position - targetY);
+    const inRangeAfterMove = newDistance <= RADIUS;
+    
+    return {
+      moved: true,
+      moveLog: moveResult.log,
+      inRangeAfterMove
+    };
+  }
+
   async speak(fromAgent: number, targetName: string, message: string): Promise<ActionResult> {
     const [sender, recipient] = await Promise.all([
       this.db.getAgent(fromAgent),
@@ -78,9 +113,25 @@ export class AgentActionHandler {
     const inRange = this.agentsInProximity(sender, recipient);
 
     if (!inRange) {
+      const moveResult = await this.attemptMoveToTarget(fromAgent, recipient.x_position, recipient.y_position);
+      
+      if (!moveResult.inRangeAfterMove) {
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${sender.name} attempted to speak to ${recipient.name}, but they were still not close enough even after moving.`;
+        return {
+          success: true,
+          log: combinedLog
+        };
+      }
+      
+      await this.db.createMessage(fromAgent, recipient.id, message);
+      
+      let combinedLog = moveResult.moveLog || '';
+      combinedLog += ` ${sender.name} then spoke to ${recipient.name} and said: "${message}".`;
+      
       return {
         success: true,
-        log: `${sender.name} attempted to speak to ${recipient.name}, but they were not close enough.`
+        log: combinedLog
       };
     }
 
@@ -235,7 +286,7 @@ export class AgentActionHandler {
       
       return {
         success: true,
-        log: `${agent.name} approached a food packet but hesitated, sensing something ominous. They appear to be contemplating a difficult decision.`,
+        log: `${agent.name} approached a mushroom but hesitated, sensing something ominous. They appear to be contemplating a difficult decision.`,
         pendingConfirmation: true
       };
     }
@@ -251,7 +302,7 @@ export class AgentActionHandler {
 
     return {
       success: true,
-      log: `${agent.name} consumed a food packet and satisfied ${gainedEnergy} hunger (satiation now at ${newEnergy}).`
+      log: `${agent.name} consumed a mushroom and satisfied ${gainedEnergy} hunger (satiation now at ${newEnergy}).`
     };
   }
 
@@ -261,14 +312,39 @@ export class AgentActionHandler {
       this.db.getAgent(fromAgent)
     ]);
 
+    if ((sender.energy || 0) < amount) {
+      throw new Error("Not satisfied enough to share that much food");
+    }
+
     const inRange = this.agentsInProximity(toAgent, sender);
 
     if (!inRange) {
-      throw new Error('Recipient is too far away');
-    }
+      const moveResult = await this.attemptMoveToTarget(fromAgent, toAgent.x_position, toAgent.y_position);
+      
+      if (!moveResult.inRangeAfterMove) {
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${sender.name} attempted to gift food to ${toAgent.name}, but they were still not close enough even after moving.`;
+        return {
+          success: true,
+          log: combinedLog
+        };
+      }
+      
+      const newSenderEnergy = (sender.energy || 0) - amount;
+      const newRecipientEnergy = (toAgent.energy || 0) + amount;
 
-    if ((sender.energy || 0) < amount) {
-      throw new Error("Not satisfied enough to share that much food");
+      await Promise.all([
+        this.db.updateAgent(fromAgent, { energy: newSenderEnergy }),
+        this.db.updateAgent(toAgent.id, { energy: newRecipientEnergy })
+      ]);
+
+      let combinedLog = moveResult.moveLog || '';
+      combinedLog += ` ${sender.name} then shared ${amount} food with ${toAgent.name} (${sender.name} satiation now ${newSenderEnergy}; ${toAgent.name} satiation now ${newRecipientEnergy}).`;
+      
+      return {
+        success: true,
+        log: combinedLog
+      };
     }
 
     const newSenderEnergy = (sender.energy || 0) - amount;
@@ -296,7 +372,43 @@ export class AgentActionHandler {
 
     const inRange = this.agentsInProximity(toAgent, sender);
     if (!inRange) {
-      throw new Error('Target is too far away to steal from');
+      const moveResult = await this.attemptMoveToTarget(byAgent, toAgent.x_position, toAgent.y_position);
+      
+      if (!moveResult.inRangeAfterMove) {
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${sender.name} attempted to steal from ${toAgent.name}, but they were still not close enough even after moving.`;
+        return {
+          success: true,
+          log: combinedLog
+        };
+      }
+      
+      const success = Math.random() < SUCCESS_RATE;
+      if (!success) {
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${sender.name} then attempted to steal food from ${toAgent.name} but failed.`;
+        return {
+          success: true,
+          log: combinedLog
+        };
+      }
+
+      const stealable = Math.min(toAgent.energy || 0, STEAL_AMOUNT);
+      const newSenderEnergy = (sender.energy || 0) + stealable;
+      const newRecipientEnergy = (toAgent.energy || 0) - stealable;
+
+      await Promise.all([
+        this.db.updateAgent(byAgent, { energy: newSenderEnergy }),
+        this.db.updateAgent(toAgent.id, { energy: newRecipientEnergy })
+      ]);
+
+      let combinedLog = moveResult.moveLog || '';
+      combinedLog += ` ${sender.name} then successfully stole food from ${toAgent.name}, making them hungrier (${sender.name} satiation now ${newSenderEnergy}; ${toAgent.name} satiation now ${newRecipientEnergy}).`;
+      
+      return {
+        success: true,
+        log: combinedLog
+      };
     }
 
     const success = Math.random() < SUCCESS_RATE;
@@ -319,6 +431,71 @@ export class AgentActionHandler {
     return {
       success: true,
       log: `${sender.name} successfully stole food from ${toAgent.name}, making them hungrier (${sender.name} satiation now ${newSenderEnergy}; ${toAgent.name} satiation now ${newRecipientEnergy}).`
+    };
+  }
+
+  private async performAttack(senderId: number, targetId: number, senderName: string, targetName: string, attackCost: number, attackDamage: number, senderEnergy: number, targetEnergy: number): Promise<{ newSenderEnergy: number; newTargetEnergy: number; logMessage: string }> {
+    const newSenderEnergy = senderEnergy - attackCost;
+    const newTargetEnergy = Math.max(0, targetEnergy - attackDamage);
+
+    await Promise.all([
+      this.db.updateAgent(senderId, { energy: newSenderEnergy }),
+      this.db.updateAgent(targetId, { energy: newTargetEnergy })
+    ]);
+
+    return {
+      newSenderEnergy,
+      newTargetEnergy,
+      logMessage: `${senderName} attacked ${targetName}, dealing ${attackDamage} damage (${senderName} satiation now ${newSenderEnergy}; ${targetName} satiation now ${newTargetEnergy}).`
+    };
+  }
+
+  async attackOtherBeing(byAgent: number, targetName: string): Promise<ActionResult> {
+    const ATTACK_COST = 5;
+    const ATTACK_DAMAGE = 30;
+
+    const [toAgent, sender] = await Promise.all([
+      this.db.getAgentByName(targetName),
+      this.db.getAgent(byAgent)
+    ]);
+
+    if ((sender.energy || 0) < ATTACK_COST) {
+      throw new Error("Not enough energy to attack");
+    }
+
+    if (toAgent.id === byAgent) {
+      throw new Error("Cannot attack yourself");
+    }
+
+    const inRange = this.agentsInProximity(toAgent, sender);
+    if (!inRange) {
+      const moveResult = await this.attemptMoveToTarget(byAgent, toAgent.x_position, toAgent.y_position);
+      
+      if (!moveResult.inRangeAfterMove) {
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${sender.name} attempted to attack ${toAgent.name}, but they were still not close enough even after moving.`;
+        return {
+          success: true,
+          log: combinedLog
+        };
+      }
+      
+      const attackResult = await this.performAttack(byAgent, toAgent.id, sender.name, toAgent.name, ATTACK_COST, ATTACK_DAMAGE, sender.energy || 0, toAgent.energy || 0);
+      
+      let combinedLog = moveResult.moveLog || '';
+      combinedLog += ` ${sender.name} then ${attackResult.logMessage.substring(sender.name.length + 1)}`;
+      
+      return {
+        success: true,
+        log: combinedLog
+      };
+    }
+
+    const attackResult = await this.performAttack(byAgent, toAgent.id, sender.name, toAgent.name, ATTACK_COST, ATTACK_DAMAGE, sender.energy || 0, toAgent.energy || 0);
+
+    return {
+      success: true,
+      log: attackResult.logMessage
     };
   }
 
@@ -409,9 +586,34 @@ export class AgentActionHandler {
 
     const distance = Math.hypot(tree.x_position - agent.x_position, tree.y_position - agent.y_position);
     if (distance > 10) {
+      const moveResult = await this.attemptMoveToTarget(agentId, tree.x_position, tree.y_position);
+      
+      if (!moveResult.inRangeAfterMove) {
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${agent.name} tried to harvest fruit from a tree, but it was still too far away even after moving.`;
+        return {
+          success: false,
+          log: combinedLog
+        };
+      }
+      
+      const FRUIT_ENERGY = 30;
+      const newEnergy = Math.min(agent.energy + FRUIT_ENERGY, 100);
+      const gainedEnergy = newEnergy - agent.energy;
+
+      await Promise.all([
+        this.db.consumeTree(treeId),
+        this.db.updateAgent(agentId, { energy: newEnergy })
+      ]);
+
+      const planterName = tree.planted_by ? (await this.db.getAgent(tree.planted_by)).name : 'someone unknown';
+
+      let combinedLog = moveResult.moveLog || '';
+      combinedLog += ` ${agent.name} then harvested the ripe fruits from a tree planted by ${planterName}, gaining ${gainedEnergy} satiation (satiation now ${newEnergy}). The tree is now cut down.`;
+      
       return {
-        success: false,
-        log: `${agent.name} tried to harvest fruit from a tree, but it was too far away.`
+        success: true,
+        log: combinedLog
       };
     }
 
@@ -444,7 +646,7 @@ export class AgentActionHandler {
     if (!confirm) {
       return {
         success: true,
-        log: `${agent.name} stepped away from the food packet, choosing a different path forward.`
+        log: `${agent.name} stepped away from the mushroom, choosing a different path forward.`
       };
     }
 
@@ -453,7 +655,7 @@ export class AgentActionHandler {
       await this.db.deleteEnergyPacket(packetId)
       return {
         success: true,
-        log: `${agent.name} approached the food packet, but it mysteriously crumbled to dust before they could consume it.`
+        log: `${agent.name} approached the mushroom, but it mysteriously crumbled to dust before they could consume it.`
       };
     }
 
@@ -475,7 +677,7 @@ export class AgentActionHandler {
 
     return {
       success: true,
-      log: `${agent.name} consumed a food packet and satisfied ${gainedEnergy} hunger (satiation now at ${newEnergy}). `
+      log: `${agent.name} consumed a mushroom and satisfied ${gainedEnergy} hunger (satiation now at ${newEnergy}). `
     };
   }
 
@@ -523,9 +725,61 @@ export class AgentActionHandler {
 
     const distance = Math.hypot(egg.x_position - agent.x_position, egg.y_position - agent.y_position);
     if (distance > 10) {
+      const moveResult = await this.attemptMoveToTarget(agentId, egg.x_position, egg.y_position);
+      
+      if (!moveResult.inRangeAfterMove) {
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${agent.name} tried to nurture an egg, but it was still too far away even after moving.`;
+        return {
+          success: false,
+          log: combinedLog
+        };
+      }
+      
+      if (egg.nurtured_times > 0 && egg.nurtured_by !== agentId) {
+        const originalNurturer = await this.db.getAgent(egg.nurtured_by!);
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${agent.name} then tried to nurture an egg, but ${originalNurturer.name} has already begun caring for it and must continue.`;
+        return {
+          success: false,
+          log: combinedLog
+        };
+      }
+
+      const newNurturedTimes = egg.nurtured_times + 1;
+      
+      await this.db.updateEgg(eggId, { 
+        nurtured_times: newNurturedTimes, 
+        nurtured_by: agentId 
+      });
+
+      if (newNurturedTimes >= 5) {
+        const colors = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        const newAgentId = await this.db.createAgent(egg.name, randomColor, egg.x_position, egg.y_position);
+        
+        const parentName = (await this.db.getAgent(egg.laid_by!)).name;
+        const caretakerName = agent.name;
+        const initialMemory = `${parentName} is my parent, and ${caretakerName} is my primary caretaker. They worked hard to bring me into this world.`;
+        await this.db.createMemory(newAgentId, initialMemory);
+        
+        await this.db.updateEgg(eggId, { hatched: true });
+
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${agent.name} then provided the final care needed for the egg. ${egg.name} has hatched and entered the world, remembering both their parent and caretaker.`;
+        
+        return {
+          success: true,
+          log: combinedLog
+        };
+      }
+
+      let combinedLog = moveResult.moveLog || '';
+      combinedLog += ` ${agent.name} then nurtured an egg (${newNurturedTimes}/5 times cared for). The egg grows stronger under their care.`;
+      
       return {
-        success: false,
-        log: `${agent.name} tried to nurture an egg, but it was too far away.`
+        success: true,
+        log: combinedLog
       };
     }
 
@@ -684,6 +938,11 @@ export async function handleFunctionCalls(
       case "steal_food": {
         const target = reqString(args, "target_name");
         result = await handler.stealFood(agentId, target);
+        break;
+      }
+      case "attack_other_being": {
+        const target = reqString(args, "target_name");
+        result = await handler.attackOtherBeing(agentId, target);
         break;
       }
       case "confirm_consume_ominous": {

@@ -41,7 +41,6 @@
   function getProcessingAgentId(): number | null {
     if (agents.length === 0) return null;
     
-    // Find agent that's currently being processed
     const processingAgent = agents.find(agent => agent.currently_being_processed);
     
     return processingAgent?.id || null;
@@ -480,13 +479,11 @@
     function playHeartAnimation(eggId: number) {
       if (!browser || !app || !AnimatedSprite || !Assets) return;
       
-      // Don't create multiple heart animations for the same egg
       if (heartSprites.has(eggId)) return;
       
       const eggSprite = eggSprites.get(eggId);
       if (!eggSprite) return;
       
-      // Create heart animation frames
       const heartTextures = [];
       try {
         heartTextures.push(Assets.get('heart_0'));
@@ -510,7 +507,6 @@
       heartSprite.play();
       heartSprites.set(eggId, heartSprite);
       
-      // Remove heart animation after 5 seconds
       setTimeout(() => {
         removeHeartAnimation(eggId);
       }, 5000);
@@ -776,7 +772,6 @@
         const container = character.getContainer();
         container.zIndex = agent.y_position + 0.0001;
         
-        // Check if energy increased (agent replenished energy)
         if (agent.energy > previousEnergy) {
           console.log(`Agent ${agent.id} replenished energy from ${previousEnergy} to ${agent.energy}, playing regen effect`);
           playRegenEffect(container.x, container.y);
@@ -786,7 +781,6 @@
         createAgentSprite(agent);
       }
       
-      // Update previous energy tracking
       previousAgentEnergies.set(agent.id, agent.energy);
     });
     
@@ -837,7 +831,6 @@
 
     energySprites.forEach((sprite, packetId) => {
       if (!energy.find(e => e.id === packetId)) {
-        // Check if the packet was booby-trapped by looking at texture source
         const isElectricEffect = sprite.texture?.source?.resource?.src?.includes('poisonous_mushrooms') ||
                                 sprite.texture?.source?.label?.includes('poisonous_mushrooms');
         
@@ -929,13 +922,11 @@
       const sprite = eggSprites.get(egg.id);
       const previousNurtureCount = previousNurtureCounts.get(egg.id) || 0;
       
-      // Check if egg was just nurtured (nurture count increased)
       if (egg.nurtured_times > previousNurtureCount && !egg.hatched) {
         console.log(`Egg ${egg.id} was nurtured! Playing heart animation`);
         playHeartAnimation(egg.id);
       }
       
-      // Update the previous nurture count
       previousNurtureCounts.set(egg.id, egg.nurtured_times);
       
       if (sprite) {
@@ -1042,24 +1033,20 @@
   const curseUpdateTrigger = $derived.by(() => {
     if (!browser || !app || !pixiInitialized) return '';
     
-    // Get currently cursed agents from the direct data
     const currentlyCursed = new Set(cursedAgents);
     
-    // Apply curse animations for newly cursed agents
     currentlyCursed.forEach(agentId => {
       if (!localCursedAgents.has(agentId)) {
         createElectricAuraAnimation(agentId);
       }
     });
     
-    // Remove curse animations for agents no longer cursed
     localCursedAgents.forEach(agentId => {
       if (!currentlyCursed.has(agentId)) {
         removeElectricAuraAnimation(agentId);
       }
     });
     
-    // Update the local cursedAgents set
     localCursedAgents.clear();
     currentlyCursed.forEach(id => localCursedAgents.add(id));
     
@@ -1075,7 +1062,6 @@
     );
     
     theftLogs.forEach(log => {
-      // Extract victim name from log message: "X successfully stole food from Y, making them hungrier"
       const match = log.log.match(/successfully stole food from ([^,]+), making them hungrier/);
       if (match) {
         const victimName = match[1];
@@ -1093,6 +1079,34 @@
     });
     
     return theftLogs.map(log => `${log.id}:${log.log}`).join('|');
+  });
+
+  const attackUpdateTrigger = $derived.by(() => {
+    if (!browser || !app || !pixiInitialized) return '';
+    
+    const attackLogs = logs.filter(log => 
+      log.log.includes('attacked') && 
+      log.log.includes('dealing') && 
+      log.log.includes('damage')
+    );
+    
+    attackLogs.forEach(log => {
+      const match = log.log.match(/([^,]+) attacked ([^,]+), dealing \d+ damage/);
+      if (match) {
+        const victimName = match[2];
+        const victim = agents.find(a => a.name === victimName);
+        
+        if (victim) {
+          const agentCharacter = agentSprites.get(victim.id);
+          if (agentCharacter) {
+            const container = agentCharacter.getContainer();
+            playBloodSplatEffect(container.x, container.y);
+          }
+        }
+      }
+    });
+    
+    return attackLogs.map(log => `${log.id}:${log.log}`).join('|');
   });
 </script>
 
@@ -1119,4 +1133,5 @@
   {processingUpdateTrigger || ''}
   {curseUpdateTrigger || ''}
   {theftUpdateTrigger || ''}
+  {attackUpdateTrigger || ''}
 </div>

@@ -88,7 +88,7 @@ export class PromptGenerator {
         Intuitively, you know that this is a sort of game. The rules are these:
         - You can talk to other beings. You just have to be in talking range, which is pretty close to them.
         - You can move to any position within the bounds of the world. Coordinates are in percentages; fx. {x: 10%, y: 15%} would be northwest, close to the bounds of the world.
-        - Sometimes, food packets appear in the world. You may pick these up to satisfy your hunger. 
+        - Sometimes, mushrooms appear in the world. You may pick these up to satisfy your hunger. 
         - You can plant trees - this costs 15 satiation. Trees grow over time in 4 stages: tiny sapling, young tree, flowering tree, and mature fruit-bearing tree. Only mature fruit-bearing trees can be harvested to gain 30 satiation, which destroys the tree.
         - You can lay eggs to create offspring and secure your bloodline - this costs 40 satiation. Other agents (but not you) can nurture your eggs. Once another agent nurtures an egg for the first time, only that same agent can continue nurturing it. After 5 nurtures from that single caretaker, the egg hatches into a new being with memories of both its parent and caretaker. This means that if you want to go this route, it's probably a good idea to find a partner first, who's willing to care for your egg.
         - You gradually become hungrier over time. If your satiation drops to 0, you are eliminated and permanently cease to exist. Your maximum satiation is 100.
@@ -100,7 +100,7 @@ export class PromptGenerator {
         - This introduction will never be shown to you again. From now on, it is up to you to keep track of the rules, possibilities and dangers of Asfodel. Use your memories to save what you deem important from this intro.
         - Take care; not everyone has good intentions. There are no punishments for being dishonest or deceiving other beings. Anything goes in Asfodel. You, too, are free to form any sort of alliance, make friends as well as enemies, and carve your way through the social sphere of Asfodel.
         - Other beings will remember your actions, and you would be well advised to remember the manners, moral alignment, friendliness and hostility of other beings. 
-        - There are no ways to prevent satiation loss - your satiation decreases by a fixed amount all the time. You can increase satiation by finding and consuming food packets, having other beings share food with you or by stealing food from other beings. Careful - they might steal from you, too!
+        - There are no ways to prevent satiation loss - your satiation decreases by a fixed amount all the time. You can increase satiation by finding and consuming mushrooms, having other beings share food with you or by stealing food from other beings. Careful - they might steal from you, too!
         `
       : `It's your turn to act in Asfodel. You've been alive for ${agent.times_processed} days prior to this.`;
 
@@ -147,11 +147,11 @@ export class PromptGenerator {
         }).join('\n')}`;
 
     const energyPacketsSection = !packets.length
-      ? 'There are currently no food packets left in the world. More may spawn soon.'
-      : `Food packets in the world: \n${packets.map(p => {
+      ? 'There are currently no mushrooms left in the world. More may spawn soon.'
+      : `mushrooms in the world: \n${packets.map(p => {
           const isNearby = nearbyPackets.some(np => np.id === p.id);
           const proximityNote = isNearby ? ` (nearby - consumable, ID: ${p.id})` : '';
-          return `Food packet at (x: ${p.x_position}, y: ${p.y_position})${proximityNote}`;
+          return `mushroom at (x: ${p.x_position}, y: ${p.y_position})${proximityNote}`;
         }).join('\n')}`;
 
     const treesSection = !trees.filter(t => !t.is_consumed).length

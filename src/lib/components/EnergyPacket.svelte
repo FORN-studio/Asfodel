@@ -21,5 +21,5 @@
 <div
   class="energy-packet"
   style="left: {packet.x_position}%; top: {packet.y_position}%"
-  title="Food Packet"
+  title="mushroom"
 ></div>

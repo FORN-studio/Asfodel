@@ -44,13 +44,13 @@ const moveDeclaration = {
 
 const consumeDeclaration = {
   name: 'consume_mushrooms',
-  description: 'Consume a food packet close to you to satisfy your hunger.',
+  description: 'Consume a wild cluster of mushrooms close to you to satisfy your hunger.',
   parameters: {
     type: Type.OBJECT,
     properties: {
       packet_id: {
         type: Type.STRING,
-        description: 'ID of the nearby food packet to consume.',
+        description: 'ID of the nearby wild cluster of mushrooms to consume.',
       },
     },
     required: ['packet_id'],
