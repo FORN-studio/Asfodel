@@ -36,6 +36,7 @@
 		"@google/genai": "^1.11.0",
 		"@pixi/tilemap": "^5.0.2",
 		"@supabase/supabase-js": "^2.52.1",
+		"@sveltejs/adapter-vercel": "^5.8.1",
 		"date-fns": "^4.1.0",
 		"pixi.js": "^8.11.0",
 		"type-fest": "^4.41.0"
