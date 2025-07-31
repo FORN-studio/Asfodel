@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ request }) => {
         await engine.processNextAgent();
 
         if (Math.random() < 0.03)  await engine.spawnEnergyPacket();
-        if (Math.random() < 0.04)  await engine.ageAllTrees();
+        if (Math.random() < 0.06)  await engine.ageAllTrees();
         if (Math.random() < 0.05)  await engine.cleanupExpiredEvents();
         if (Math.random() < 0.10)  await engine.cleanupStuckProcessingStates();
       } catch (err) {

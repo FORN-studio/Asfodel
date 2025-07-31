@@ -22,6 +22,7 @@
   function handleAgentPositionsUpdate(positions: Record<number, { x: number; y: number }>) {
     agentScreenPositions = positions;
   }
+
 </script>
 
 <style>
@@ -53,7 +54,6 @@
 <div class="map">
   <PixiCanvas {agents} {energy} {trees} {eggs} {logs} {cursedAgents} {activeMessages} {onMessageExpire} onAgentPositionsUpdate={handleAgentPositionsUpdate} />
   
-  <!-- Chat bubbles overlay -->
   <div class="chat-overlay">
     {#each agents as agent (agent.id)}
       {#if activeMessages[agent.id] && agentScreenPositions[agent.id]}

@@ -452,7 +452,7 @@ export class AgentActionHandler {
 
   async attackOtherBeing(byAgent: number, targetName: string): Promise<ActionResult> {
     const ATTACK_COST = 5;
-    const ATTACK_DAMAGE = 30;
+    const ATTACK_DAMAGE = 40;
 
     const [toAgent, sender] = await Promise.all([
       this.db.getAgentByName(targetName),

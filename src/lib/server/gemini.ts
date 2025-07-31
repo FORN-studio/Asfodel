@@ -106,6 +106,21 @@ const stealMushroomsDeclaration = {
   }
 }
 
+const attackOtherBeingDeclaration = {
+  name: 'attack_other_being',
+  description: 'Attack another being to deal significant damage to them. Costs 5 satiation and deals 40 damage. An extreme measure for extreme times.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      target_name: {
+        type: Type.STRING,
+        description: 'The name of the being you want to attack.'
+      }
+    },
+    required: ['target_name']
+  }
+}
+
 const confirmConsumeOminousDeclaration = {
   name: 'confirm_consume_ominous',
   description: 'Confirm whether to consume an ominous cluster of mushrooms that will curse a random other agent. You will not be harmed, but an innocent being will suffer.',
@@ -255,6 +270,7 @@ export const generate = async (input: string, maxRetries: number = 5) => {
                             moveDeclaration,
                             consumeDeclaration,
                             stealMushroomsDeclaration,
+                            attackOtherBeingDeclaration,
                             confirmConsumeOminousDeclaration,
                             addPlanDeclaration,
                             removePlanDeclaration,
@@ -268,7 +284,7 @@ export const generate = async (input: string, maxRetries: number = 5) => {
                     toolConfig: {
                       functionCallingConfig: {
                         mode: FunctionCallingConfigMode.ANY,
-                        allowedFunctionNames: ['save_memory', 'speak', 'move', 'gift_mushrooms', 'consume_mushrooms', 'steal_food', 'confirm_consume_ominous', 'add_plan', 'remove_plan', 'plant_tree', 'consume_tree_fruits', 'lay_egg', 'nurture_egg', 'update_other_being_trustworthiness'],
+                        allowedFunctionNames: ['save_memory', 'speak', 'move', 'gift_mushrooms', 'consume_mushrooms', 'steal_food', 'attack_other_being', 'confirm_consume_ominous', 'add_plan', 'remove_plan', 'plant_tree', 'consume_tree_fruits', 'lay_egg', 'nurture_egg', 'update_other_being_trustworthiness'],
                       },
                     },
                     thinkingConfig: {
