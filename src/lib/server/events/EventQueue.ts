@@ -1,5 +1,6 @@
 import type { Tables } from "$lib/database.types";
 import { DatabaseService } from "../data/DatabaseService";
+import { getPluginManager } from "../plugins/PluginRegistry";
 
 export interface EventEffect {
   modifyPrompt?: (prompt: string, agentId: number) => string;
@@ -21,6 +22,15 @@ export class EventQueue {
 
   constructor() {
     this.db = new DatabaseService();
+    this.initializePluginProcessors();
+  }
+
+  private initializePluginProcessors(): void {
+    const pluginManager = getPluginManager();
+    const pluginProcessors = pluginManager.getAllEventProcessors();
+    for (const [eventName, processor] of pluginProcessors) {
+      this.processors.set(eventName, processor);
+    }
   }
 
   registerProcessor(functionName: string, processor: EventProcessor) {

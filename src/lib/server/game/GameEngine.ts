@@ -2,7 +2,6 @@ import { AgentProcessor } from "../agents/AgentProcessor";
 import { WorldManager } from "./WorldManager";
 import { DatabaseService } from "../data/DatabaseService";
 import { EventQueue } from "../events/EventQueue";
-import { ApplyCurseProcessor } from "../events/EventProcessor";
 
 export class GameEngine {
   private agentProcessor: AgentProcessor;
@@ -14,15 +13,9 @@ export class GameEngine {
     this.worldManager = new WorldManager();
     this.db = new DatabaseService();
     this.eventQueue = new EventQueue();
-
-    this.initializeEventProcessors();
     this.agentProcessor = new AgentProcessor(this.eventQueue);
     
     this.db.forceCleanupAllProcessingStates().catch(() => {});
-  }
-
-  private initializeEventProcessors(): void {
-    this.eventQueue.registerProcessor('apply_curse', new ApplyCurseProcessor());
   }
 
   async processNextAgent(): Promise<{ success: boolean; actions?: number }> {

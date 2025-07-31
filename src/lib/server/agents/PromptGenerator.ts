@@ -2,6 +2,8 @@ import type { Tables } from "$lib/database.types";
 import { format, differenceInMilliseconds } from 'date-fns';
 import type { DatabaseService } from "../data/DatabaseService";
 import { PendingActionManager } from "./AgentActions";
+import { getPluginManager } from "../plugins/PluginRegistry";
+import type { PromptContext } from "../plugins/GamePlugin";
 
 export class PromptGenerator {
   constructor(private db: DatabaseService) {}
@@ -111,27 +113,10 @@ export class PromptGenerator {
       Your position is: {x: ${agent.x_position}%, y: ${agent.y_position}%}
     `;
 
-    const conversationSection = `
-      Here is some recent conversation involving you:
-      ${messages.map((m, i) => this.formatMessage(m, i, agent.name)).join('\n')}
-    `;
-
     const actionsSection = `
       Here's your own most recent actions:
       ${ownActions?.map((a, i) => `${i + 1} days ago at x: ${a.x_position}, y: ${a.y_position}: ${a.log.replaceAll(agent.name, 'You')}`).join('\n')}
     `;
-
-    const memoriesSection = !memories.length
-      ? 'You currently have no memories.'
-      : `You currently have ${memories.length} memories: \n${memories.join('\n')}`;
-
-    const plansSection = !plans.length
-      ? 'You currently have no plans.'
-      : `You currently have ${plans.length} plans: \n${plans.map(p => `Plan ${p.id}: "${p.plan}"`).join('\n')}`;
-
-    const trustSection = !trustRelationships.length
-      ? 'You have not yet assessed the trustworthiness of any other beings.'
-      : `Your trust assessments of other beings: \n${trustRelationships.map(tr => `${tr.other_agent_name}: ${tr.trustworthiness}/100 trust`).join('\n')}`;
 
     const nearbyEventsSection = `
       Here's what's happened in Asfodel around the area you're currently in (including your own actions):
@@ -144,54 +129,6 @@ export class PromptGenerator {
           const isNearby = nearbyAgents.some(na => na.id === a.id);
           const proximityNote = isNearby ? ' (nearby - can talk to, share food with, or steal from)' : '';
           return `${a.name} at (x: ${a.x_position}, y: ${a.y_position}) - satiation: ${a.energy}${proximityNote}`;
-        }).join('\n')}`;
-
-    const energyPacketsSection = !packets.length
-      ? 'There are currently no mushrooms left in the world. More may spawn soon.'
-      : `mushrooms in the world: \n${packets.map(p => {
-          const isNearby = nearbyPackets.some(np => np.id === p.id);
-          const proximityNote = isNearby ? ` (nearby - consumable, ID: ${p.id})` : '';
-          return `mushroom at (x: ${p.x_position}, y: ${p.y_position})${proximityNote}`;
-        }).join('\n')}`;
-
-    const treesSection = !trees.filter(t => !t.is_consumed).length
-      ? 'There are currently no trees in the world. You can plant new trees for 15 satiation.'
-      : `Trees in the world: \n${trees.filter(t => !t.is_consumed).map(t => {
-          const stage = this.getTreeStage(t);
-          const isNearby = nearbyTrees.some(nt => nt.id === t.id);
-          const isHarvestable = t.age >= 20 && !t.is_consumed;
-          let proximityNote = '';
-          if (isNearby && isHarvestable) {
-            proximityNote = ` (nearby - ready for harvest, ID: ${t.id}, planted by ${t.planted_by?.name || 'someone long ago'}) - GIVES 30 SATIATION`;
-          } else if (isNearby) {
-            proximityNote = ' (nearby)';
-          }
-          return `Tree at (x: ${t.x_position}, y: ${t.y_position}) - ${stage}${proximityNote}`;
-        }).join('\n')}`;
-
-    const eggsSection = !eggs.length
-      ? 'There are currently no eggs in the world. You can lay eggs for 50 satiation to create offspring.'
-      : `Eggs in the world: \n${eggs.map(e => {
-          const stage = e.nurtured_times === 0 ? 'newly laid' 
-            : e.nurtured_times >= 5 ? 'ready to hatch' 
-            : `nurtured ${e.nurtured_times}/5 times`;
-          const layerName = e.laid_by?.name || 'unknown';
-          const caretakerName = e.nurtured_by?.name || 'none yet';
-          const isNearby = nearbyEggs.some(ne => ne.id === e.id);
-          
-          let proximityNote = '';
-          if (isNearby) {
-            if (e.laid_by?.id === agent.id) {
-              proximityNote = ` (nearby - your own egg, ID: ${e.id}) - you cannot nurture your own offspring`;
-            } else if (e.nurtured_times > 0 && e.nurtured_by?.name !== agent.name) {
-              proximityNote = ` (nearby - ID: ${e.id}) - being cared for exclusively by ${e.nurtured_by?.name}, you cannot nurture this egg`;
-            } else {
-              const availabilityStatus = e.nurtured_times === 0 ? 'available for nurturing' : `nurtured ${e.nurtured_times}/5 times by you`;
-              proximityNote = ` (nearby - ${availabilityStatus}, ID: ${e.id})`;
-            }
-          }
-          
-          return `Egg "${e.name}" at (x: ${e.x_position}, y: ${e.y_position}) - ${stage}, laid by ${layerName}, cared for by ${caretakerName}${proximityNote}`;
         }).join('\n')}`;
 
     const urgencySection = agent.energy <= 20
@@ -211,30 +148,38 @@ export class PromptGenerator {
       ? `What is your decision regarding the strange packet? Will you consume it and curse another, or choose a different path? Remember: if you choose to unleash the curse, noone will know it was you. This is kept entirely secret.`
       : `What will your next move be? Make it count - death awaits if your satiation drops to 0. No matter what you do, your satiation will decrease by exactly ${COST} this turn; no actions cause more satiation loss than others, and even doing nothing will decrease your satiation by exactly ${COST}.`;
 
+    const pluginManager = getPluginManager();
+    const context: PromptContext = {
+      agent,
+      messages,
+      nearbyEvents,
+      ownActions,
+      allAgents,
+      packets,
+      memories,
+      plans,
+      trees,
+      eggs,
+      trustRelationships
+    };
+    
+    const pluginContributions = await pluginManager.gatherPromptContributions(context, this.db);
+    const pluginSection = pluginContributions.length > 0 
+      ? pluginContributions.join('\n\n') 
+      : '';
+
     return `
       ${introSection}
 
       ${statsSection}
 
-      ${conversationSection}
-
       ${actionsSection}
-
-      ${memoriesSection}
-
-      ${plansSection}
-
-      ${trustSection}
 
       ${nearbyEventsSection}
 
       ${agentsSection}
 
-      ${energyPacketsSection}
-
-      ${treesSection}
-
-      ${eggsSection}
+      ${pluginSection}
 
       ${urgencySection}
 

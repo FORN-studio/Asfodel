@@ -3,7 +3,7 @@ import { DatabaseService } from "../data/DatabaseService";
 import { PromptGenerator } from "./PromptGenerator";
 import { EventQueue } from "../events/EventQueue";
 import { generate } from "../gemini";
-import { handleFunctionCalls, PendingActionManager, AgentActionHandler } from "./AgentActions";
+import { handleFunctionCalls, PendingActionManager } from "./AgentActions";
 
 export class AgentProcessor {
   private db: DatabaseService;
@@ -64,12 +64,9 @@ export class AgentProcessor {
       }
     }
 
-    const actionHandler = new AgentActionHandler();
-    actionHandler.setOriginalPosition(agent.id, agent.x_position, agent.y_position);
-
     try {
       const response = await generate(prompt);
-      const results = await handleFunctionCalls(response, agent.id, actionHandler);
+      const results = await handleFunctionCalls(response, agent.id);
 
       for (const result of results) {
         await this.db.createLog(
@@ -99,7 +96,6 @@ export class AgentProcessor {
       const shouldEndTurn = !results.some(r => r.result.pendingConfirmation) && !PendingActionManager.hasPendingBoobyTrap(agent.id);
       
       if (shouldEndTurn) {
-        actionHandler.clearOriginalPosition(agent.id);
         await Promise.all([
           this.db.updateAgent(updatedAgent.id, { 
             energy: Math.floor(updatedAgent.energy - energyCost),
@@ -114,7 +110,6 @@ export class AgentProcessor {
       console.error(`Failed to process agent ${agent.name} (${agent.id}) after all retries:`, error);
       
       try {
-        actionHandler.clearOriginalPosition(agent.id);
         PendingActionManager.clearPendingBoobyTrap(agent.id);
         
         await this.db.createLog(
