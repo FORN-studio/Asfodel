@@ -88,7 +88,7 @@
   .chat-bubble-bottom {
     top: 100%;
     left: 50%;
-    transform: translateX(-50%) translateY(-20px);
+    transform: translateX(-50%) translateY(100px);
     margin-top: 8px;
 
     &::after {
