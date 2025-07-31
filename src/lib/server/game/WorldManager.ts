@@ -52,6 +52,14 @@ export class WorldManager {
       queries.push(query);
     }
 
+    for (let i = 0; i < 3; i++) {
+      const query = this.db.createGoldChest(
+        this.randomInRange(5, 95),
+        this.randomInRange(5, 95)
+      );
+      queries.push(query);
+    }
+
     await Promise.all(queries);
 
     return { success: true };
@@ -63,6 +71,7 @@ export class WorldManager {
         supabase.from('agents').delete().neq('id', 0).throwOnError(),
         supabase.from('logs').delete().neq('id', 0).throwOnError(),
         supabase.from('energy_packets').delete().neq('id', '6e17b51f-3e0a-4571-9628-a1b80b5c77a6').throwOnError(),
+        supabase.from('gold_chests').delete().neq('id', '00000000-0000-0000-0000-000000000000').throwOnError(),
         supabase.from('messages').delete().neq('id', 0).throwOnError(),
         supabase.from('agent_plans').delete().neq('id', 0).throwOnError(),
         supabase.from('trees').delete().neq('id', '00000000-0000-0000-0000-000000000000').throwOnError(),
@@ -85,6 +94,13 @@ export class WorldManager {
       this.randomInRange(5, 95),
       this.randomInRange(5, 95),
       isBoobyTrapped
+    );
+  }
+
+  async spawnRandomGoldChest(): Promise<void> {
+    await this.db.createGoldChest(
+      this.randomInRange(5, 95),
+      this.randomInRange(5, 95)
     );
   }
 }

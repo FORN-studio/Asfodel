@@ -35,6 +35,10 @@ export class GameEngine {
     await this.worldManager.spawnRandomEnergyPacket();
   }
 
+  async spawnGoldChest(): Promise<void> {
+    await this.worldManager.spawnRandomGoldChest();
+  }
+
   async cleanupExpiredEvents(): Promise<void> {
     await this.eventQueue.cleanupExpiredEvents();
   }

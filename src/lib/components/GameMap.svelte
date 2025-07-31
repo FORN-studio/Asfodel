@@ -7,6 +7,7 @@
   type Props = {
     agents: Tables<'agents'>[];
     energy: Tables<'energy_packets'>[];
+    goldChests: Tables<'gold_chests'>[];
     trees: Tables<'trees'>[];
     eggs: Tables<'eggs'>[];
     logs: Tables<'logs'>[];
@@ -15,7 +16,7 @@
     onMessageExpire: (agentId: number) => void;
   };
 
-  const { agents, energy, trees, eggs, logs, cursedAgents, activeMessages, onMessageExpire }: Props = $props();
+  const { agents, energy, goldChests, trees, eggs, logs, cursedAgents, activeMessages, onMessageExpire }: Props = $props();
   
   let agentScreenPositions = $state<Record<number, { x: number; y: number }>>({});
   
@@ -52,7 +53,7 @@
 </style>
 
 <div class="map">
-  <PixiCanvas {agents} {energy} {trees} {eggs} {logs} {cursedAgents} {activeMessages} {onMessageExpire} onAgentPositionsUpdate={handleAgentPositionsUpdate} />
+  <PixiCanvas {agents} {energy} {goldChests} {trees} {eggs} {logs} {cursedAgents} {activeMessages} {onMessageExpire} onAgentPositionsUpdate={handleAgentPositionsUpdate} />
   
   <div class="chat-overlay">
     {#each agents as agent (agent.id)}

@@ -27,24 +27,28 @@ export class SocialPlugin implements GamePlugin {
         },
       },
       {
-        name: 'steal_food',
-        description: 'Attempt to steal food from another being, making them hungrier while you become more satisfied. This has an 80% chance of succeeding.',
+        name: 'steal_gold',
+        description: 'Attempt to steal gold from another being. This has an 80% chance of succeeding.',
         parameters: {
           type: Type.OBJECT,
           properties: {
             target_name: {
               type: Type.STRING,
-              description: 'The name of the being you want to steal food from.'
+              description: 'The name of the being you want to steal gold from.'
+            },
+            amount: {
+              type: Type.NUMBER,
+              description: 'Amount of gold you want to try to steal (cannot exceed their current gold).'
             }
           },
-          required: ['target_name']
+          required: ['target_name', 'amount']
         }
       }
     ];
   }
 
   canHandleFunction(functionName: string): boolean {
-    return functionName === 'gift_mushrooms' || functionName === 'steal_food';
+    return functionName === 'gift_mushrooms' || functionName === 'steal_gold';
   }
 
   async handleFunction(
@@ -57,9 +61,10 @@ export class SocialPlugin implements GamePlugin {
       const targetName = args.target_name as string;
       const amount = args.amount as number;
       return await this.giftEnergy(agentId, targetName, amount, db);
-    } else if (functionName === 'steal_food') {
+    } else if (functionName === 'steal_gold') {
       const targetName = args.target_name as string;
-      return await this.stealFood(agentId, targetName, db);
+      const amount = args.amount as number;
+      return await this.stealGold(agentId, targetName, amount, db);
     } else {
       throw new Error(`SocialPlugin cannot handle function: ${functionName}`);
     }
@@ -120,14 +125,27 @@ export class SocialPlugin implements GamePlugin {
     };
   }
 
-  private async stealFood(byAgent: number, targetName: string, db: DatabaseService): Promise<ActionResult> {
-    const STEAL_AMOUNT = 20;
+  private async stealGold(byAgent: number, targetName: string, amount: number, db: DatabaseService): Promise<ActionResult> {
     const SUCCESS_RATE = 0.8;
 
     const [toAgent, sender] = await Promise.all([
       db.getAgentByName(targetName),
       db.getAgent(byAgent)
     ]);
+
+    if (amount <= 0) {
+      return {
+        success: false,
+        log: `${sender.name} must specify a positive amount of gold to steal.`
+      };
+    }
+
+    if ((toAgent.gold || 0) < amount) {
+      return {
+        success: false,
+        log: `${sender.name} tried to steal ${amount} gold from ${toAgent.name}, but they only have ${toAgent.gold || 0} gold.`
+      };
+    }
 
     const inRange = this.agentsInProximity(toAgent, sender);
     if (!inRange) {
@@ -145,24 +163,24 @@ export class SocialPlugin implements GamePlugin {
       const success = Math.random() < SUCCESS_RATE;
       if (!success) {
         let combinedLog = moveResult.moveLog || '';
-        combinedLog += ` ${sender.name} then attempted to steal food from ${toAgent.name} but failed.`;
+        combinedLog += ` ${sender.name} then attempted to steal gold from ${toAgent.name} but failed.`;
         return {
           success: true,
           log: combinedLog
         };
       }
 
-      const stealable = Math.min(toAgent.energy || 0, STEAL_AMOUNT);
-      const newSenderEnergy = (sender.energy || 0) + stealable;
-      const newRecipientEnergy = (toAgent.energy || 0) - stealable;
+      const stealable = Math.min(toAgent.gold || 0, amount);
+      const newSenderGold = (sender.gold || 0) + stealable;
+      const newRecipientGold = (toAgent.gold || 0) - stealable;
 
       await Promise.all([
-        db.updateAgent(byAgent, { energy: newSenderEnergy }),
-        db.updateAgent(toAgent.id, { energy: newRecipientEnergy })
+        db.updateAgent(byAgent, { gold: newSenderGold }),
+        db.updateAgent(toAgent.id, { gold: newRecipientGold })
       ]);
 
       let combinedLog = moveResult.moveLog || '';
-      combinedLog += ` ${sender.name} then successfully stole food from ${toAgent.name}, making them hungrier (${sender.name} satiation now ${newSenderEnergy}; ${toAgent.name} satiation now ${newRecipientEnergy}).`;
+      combinedLog += ` ${sender.name} then successfully stole ${stealable} gold from ${toAgent.name} (${sender.name} gold now ${newSenderGold}; ${toAgent.name} gold now ${newRecipientGold}).`;
       
       return {
         success: true,
@@ -174,22 +192,22 @@ export class SocialPlugin implements GamePlugin {
     if (!success) {
       return {
         success: true,
-        log: `${sender.name} attempted to steal food from ${toAgent.name} but failed.`
+        log: `${sender.name} attempted to steal gold from ${toAgent.name} but failed.`
       };
     }
 
-    const stealable = Math.min(toAgent.energy || 0, STEAL_AMOUNT);
-    const newSenderEnergy = (sender.energy || 0) + stealable;
-    const newRecipientEnergy = (toAgent.energy || 0) - stealable;
+    const stealable = Math.min(toAgent.gold || 0, amount);
+    const newSenderGold = (sender.gold || 0) + stealable;
+    const newRecipientGold = (toAgent.gold || 0) - stealable;
 
     await Promise.all([
-      db.updateAgent(byAgent, { energy: newSenderEnergy }),
-      db.updateAgent(toAgent.id, { energy: newRecipientEnergy })
+      db.updateAgent(byAgent, { gold: newSenderGold }),
+      db.updateAgent(toAgent.id, { gold: newRecipientGold })
     ]);
 
     return {
       success: true,
-      log: `${sender.name} successfully stole food from ${toAgent.name}, making them hungrier (${sender.name} satiation now ${newSenderEnergy}; ${toAgent.name} satiation now ${newRecipientEnergy}).`
+      log: `${sender.name} successfully stole ${stealable} gold from ${toAgent.name} (${sender.name} gold now ${newSenderGold}; ${toAgent.name} gold now ${newRecipientGold}).`
     };
   }
 

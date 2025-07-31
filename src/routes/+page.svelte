@@ -6,7 +6,7 @@
   import LogToast from '$lib/components/LogToast.svelte';
 
   const { data } = $props();
-  let { agents = [], energy = [], trees = [], eggs = [], logs = [], cursedAgents = [] } = $state(data);
+  let { agents = [], energy = [], goldChests = [], trees = [], eggs = [], logs = [], cursedAgents = [] } = $state(data);
   
   let activeMessages = $state<Record<number, { content: string; timestamp: number }>>({});
   
@@ -54,6 +54,33 @@
       .subscribe();
 
     console.log('Energy channel subscription created');
+
+    const goldChestsChannel = supabase
+      .channel('gold_chests_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gold_chests' }, ({ eventType, new: n, old }) => {
+        console.log('Gold chest event:', eventType, 'new:', n, 'old:', old);
+        
+        if (eventType === 'INSERT' && n) {
+          const record = n as Tables<'gold_chests'>;
+          console.log('Adding gold chest:', record.id);
+          goldChests = [...goldChests, record];
+        }
+        
+        if (eventType === 'UPDATE' && n) {
+          const record = n as Tables<'gold_chests'>;
+          goldChests = goldChests.map(g => g.id === record.id ? record : g);
+        }
+        
+        if (eventType === 'DELETE' && old) {
+          const record = old as Tables<'gold_chests'>;
+          console.log('Deleting gold chest:', record.id);
+          goldChests = goldChests.filter(g => g.id !== record.id);
+          console.log('Gold chests after deletion:', goldChests.length);
+        }
+      })
+      .subscribe();
+
+    console.log('Gold chests channel subscription created');
 
     const treesChannel = supabase
       .channel('trees_changes')
@@ -151,7 +178,9 @@
     return () => {
       supabase.removeChannel(agentChannel);
       supabase.removeChannel(energyChannel);
+      supabase.removeChannel(goldChestsChannel);
       supabase.removeChannel(treesChannel);
+      supabase.removeChannel(eggsChannel);
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(logsChannel);
       supabase.removeChannel(cursedChannel);
@@ -174,6 +203,7 @@
 <GameMap 
   {agents} 
   {energy} 
+  {goldChests}
   {trees}
   {eggs}
   {logs}

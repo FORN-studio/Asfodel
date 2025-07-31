@@ -26,10 +26,10 @@ export class DatabaseService {
     return data;
   }
 
-  async getAllAgents(): Promise<Pick<Tables<'agents'>, 'id' | 'name' | 'energy' | 'x_position' | 'y_position'>[]> {
+  async getAllAgents(): Promise<Pick<Tables<'agents'>, 'id' | 'name' | 'energy' | 'gold' | 'x_position' | 'y_position'>[]> {
     const { data, error } = await supabase
       .from('agents')
-      .select('id, name, energy, x_position, y_position');
+      .select('id, name, energy, gold, x_position, y_position');
 
     if (error) throw error;
     return data;
@@ -458,6 +458,14 @@ export class DatabaseService {
     if (error) throw error
   }
 
+  async deleteTree(treeId: string): Promise<void> {
+    const { error } = await supabase
+      .from('trees')
+      .delete()
+      .eq('id', treeId);
+    if (error) throw error;
+  }
+
   async createEgg(laidBy: number, name: string, x: number, y: number): Promise<Tables<'eggs'>> {
     const { data, error } = await supabase
       .from('eggs')
@@ -601,5 +609,45 @@ export class DatabaseService {
 
     if (error) throw error;
     return (data || []).map(row => row.target_agent as number);
+  }
+
+  async getAllGoldChests(): Promise<Tables<'gold_chests'>[]> {
+    const { data, error } = await supabase
+      .from('gold_chests')
+      .select('*');
+
+    if (error) throw error;
+    return data;
+  }
+
+  async getGoldChest(id: string): Promise<Tables<'gold_chests'>> {
+    const { data, error } = await supabase
+      .from('gold_chests')
+      .select()
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async createGoldChest(xPosition: number, yPosition: number): Promise<void> {
+    const { error } = await supabase
+      .from('gold_chests')
+      .insert({
+        x_position: xPosition,
+        y_position: yPosition
+      });
+
+    if (error) throw error;
+  }
+
+  async deleteGoldChest(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('gold_chests')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
   }
 }

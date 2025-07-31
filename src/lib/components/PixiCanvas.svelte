@@ -6,6 +6,7 @@
   type Props = {
     agents: Tables<'agents'>[];
     energy: Tables<'energy_packets'>[];
+    goldChests: Tables<'gold_chests'>[];
     trees: Tables<'trees'>[];
     eggs: Tables<'eggs'>[];
     logs: Tables<'logs'>[];
@@ -15,13 +16,14 @@
     onAgentPositionsUpdate?: (positions: Record<number, { x: number; y: number }>) => void;
   };
 
-  const { agents, energy, trees, eggs, logs, cursedAgents, onAgentPositionsUpdate }: Props = $props();
+  const { agents, energy, goldChests, trees, eggs, logs, cursedAgents, onAgentPositionsUpdate }: Props = $props();
 
   let canvasEl: HTMLCanvasElement;
   let containerEl: HTMLDivElement;
   let app: any = null;
   let agentSprites = new Map<number, any>();
   let energySprites = new Map<string, any>();
+  let goldChestSprites = new Map<string, any>();
   let treeSprites = new Map<string, any>();
   let eggSprites = new Map<number, any>();
   let heartSprites = new Map<number, any>();
@@ -859,6 +861,46 @@
     });
   }
 
+  function updateGoldChestPositions() {
+    if (!browser || !app) {
+      console.log('updateGoldChestPositions early return:', { browser, app: !!app });
+      return;
+    }
+
+    console.log('Updating gold chest positions:', goldChests.length);
+
+    const existingGoldChestIds = new Set(goldChests.map(g => g.id));
+    
+    for (const [id, sprite] of goldChestSprites) {
+      if (!existingGoldChestIds.has(id)) {
+        console.log('Removing gold chest sprite:', id);
+        if (sprite.parent) {
+          sprite.parent.removeChild(sprite);
+        }
+        goldChestSprites.delete(id);
+      }
+    }
+
+    for (const goldChest of goldChests) {
+      if (!goldChestSprites.has(goldChest.id)) {
+        console.log('Creating new gold chest sprite:', goldChest.id);
+        
+        const sprite = Sprite.from('/assets/chest/chest.png');
+        sprite.anchor.set(0.5);
+        sprite.width = 40;
+        sprite.height = 40;
+        
+        const canvasWidth = app.view.width;
+        const canvasHeight = app.view.height;
+        sprite.x = (goldChest.x_position / 100) * canvasWidth;
+        sprite.y = (goldChest.y_position / 100) * canvasHeight;
+        
+        backgroundLayer.addChild(sprite);
+        goldChestSprites.set(goldChest.id, sprite);
+      }
+    }
+  }
+
   function updateTreePositions() {
     if (!browser || !app) {
       console.log('updateTreePositions early return:', { browser, app: !!app });
@@ -983,6 +1025,17 @@
     if (browser && app && pixiInitialized) {
       console.log('Energy positions/status changed, triggering update:', energy.length);
       setTimeout(() => updateEnergyPositions(), 0);
+    }
+    
+    return positions;
+  });
+
+  const goldChestUpdateTrigger = $derived.by(() => {
+    const positions = goldChests.map(chest => `${chest.id}:${chest.x_position},${chest.y_position}`).join('|');
+    
+    if (browser && app && pixiInitialized) {
+      console.log('Gold chest positions changed, triggering update:', goldChests.length);
+      setTimeout(() => updateGoldChestPositions(), 0);
     }
     
     return positions;

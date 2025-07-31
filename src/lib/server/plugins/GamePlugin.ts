@@ -14,13 +14,14 @@ export interface PromptContext {
   messages: any[];
   nearbyEvents: any[];
   ownActions: any[];
-  allAgents: Pick<Tables<'agents'>, 'id' | 'name' | 'energy' | 'x_position' | 'y_position'>[];
+  allAgents: Pick<Tables<'agents'>, 'id' | 'name' | 'energy' | 'gold' | 'x_position' | 'y_position'>[];
   packets: Tables<'energy_packets'>[];
   memories: string[];
   plans: Array<{ id: number; plan: string; created_at: string }>;
   trees: (Tables<'trees'> & { planted_by: { name: string } | null })[];
   eggs: (Tables<'eggs'> & { laid_by: { id: number, name: string, x_position: number, y_position: number } | null, nurtured_by: { name: string } | null })[];
   trustRelationships: Array<{ other_agent_name: string; trustworthiness: number }>;
+  goldChests: Tables<'gold_chests'>[];
 }
 
 export interface GamePlugin {

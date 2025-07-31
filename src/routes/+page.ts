@@ -6,6 +6,7 @@ export const load: PageLoad = async () => {
         const [
             {data: agents, error: agentsErr},
             {data: energy, error: energyErr},
+            {data: goldChests, error: goldChestsErr},
             {data: trees, error: treesErr},
             {data: eggs, error: eggsErr},
             { data: messages, error: messagesErr },
@@ -14,6 +15,7 @@ export const load: PageLoad = async () => {
         ] = await Promise.all([
             supabase.from('agents').select('*'),
             supabase.from('energy_packets').select('*'),
+            supabase.from('gold_chests').select('*'),
             supabase.from('trees').select('*'),
             supabase.from('eggs').select('*'),
             supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(10),
@@ -26,6 +28,9 @@ export const load: PageLoad = async () => {
         }
         if (energyErr) {
             console.error('Error loading energy packets:', energyErr)
+        }
+        if (goldChestsErr) {
+            console.error('Error loading gold chests:', goldChestsErr)
         }
         if (treesErr) {
             console.error('Error loading trees:', treesErr)
@@ -46,6 +51,7 @@ export const load: PageLoad = async () => {
         return { 
             agents: agents || [], 
             energy: energy || [], 
+            goldChests: goldChests || [],
             trees: trees || [],
             eggs: eggs || [],
             messages: messages || [], 
@@ -57,6 +63,7 @@ export const load: PageLoad = async () => {
         return { 
             agents: [], 
             energy: [], 
+            goldChests: [],
             trees: [],
             eggs: [],
             messages: [], 

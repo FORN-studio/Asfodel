@@ -28,7 +28,7 @@ export class AgriculturePlugin implements GamePlugin {
       },
       {
         name: 'consume_tree_fruits',
-        description: 'Harvest fruits from a mature fruit-bearing tree that is close to you. Trees must be exactly 20+ turns old to bear fruit. Gives 30 satiation and completely destroys the tree.',
+        description: 'Harvest fruits from a mature fruit-bearing tree that is close to you. Trees must be exactly 20+ turns old to bear fruit. Gives 30 satiation and resets tree age to 0.',
         parameters: {
           type: Type.OBJECT,
           properties: {
@@ -39,12 +39,26 @@ export class AgriculturePlugin implements GamePlugin {
           },
           required: ['tree_id']
         }
+      },
+      {
+        name: 'cut_down_tree',
+        description: 'Cut down any tree (regardless of age) to earn gold. This permanently removes the tree.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            tree_id: {
+              type: Type.STRING,
+              description: 'ID of the tree to cut down for gold.'
+            }
+          },
+          required: ['tree_id']
+        }
       }
     ];
   }
 
   canHandleFunction(functionName: string): boolean {
-    return functionName === 'plant_tree' || functionName === 'consume_tree_fruits';
+    return functionName === 'plant_tree' || functionName === 'consume_tree_fruits' || functionName === 'cut_down_tree';
   }
 
   async handleFunction(
@@ -60,6 +74,9 @@ export class AgriculturePlugin implements GamePlugin {
     } else if (functionName === 'consume_tree_fruits') {
       const treeId = args.tree_id as string;
       return await this.consumeTreeFruits(agentId, treeId, db);
+    } else if (functionName === 'cut_down_tree') {
+      const treeId = args.tree_id as string;
+      return await this.cutDownTree(agentId, treeId, db);
     } else {
       throw new Error(`AgriculturePlugin cannot handle function: ${functionName}`);
     }
@@ -113,22 +130,22 @@ export class AgriculturePlugin implements GamePlugin {
     }
 
     const agent = await db.getAgent(agentId);
-    const PLANT_COST = 15;
+    const PLANT_COST = 10;
 
-    if (agent.energy < PLANT_COST) {
-      throw new Error('Not enough energy to plant a tree');
+    if ((agent.gold || 0) < PLANT_COST) {
+      throw new Error('Not enough gold to plant a tree');
     }
 
     const finalPosition = await this.findEmptyPositionForTree(agentId, x, y, db);
 
     await Promise.all([
       db.createTree(agentId, Math.round(finalPosition.x), Math.round(finalPosition.y)),
-      db.updateAgent(agentId, { energy: agent.energy - PLANT_COST })
+      db.updateAgent(agentId, { gold: (agent.gold || 0) - PLANT_COST })
     ]);
 
-    let logMessage = `${agent.name} planted a small tree sapling, investing ${PLANT_COST} satiation in future growth.`;
+    let logMessage = `${agent.name} planted a small tree sapling, investing ${PLANT_COST} gold in future growth.`;
     if (finalPosition.x !== x || finalPosition.y !== y) {
-      logMessage = `${agent.name} found the desired spot crowded, so they planted a small tree sapling at a nearby clearing, investing ${PLANT_COST} satiation in future growth.`;
+      logMessage = `${agent.name} found the desired spot crowded, so they planted a small tree sapling at a nearby clearing, investing ${PLANT_COST} gold in future growth.`;
     }
 
     return {
@@ -175,14 +192,14 @@ export class AgriculturePlugin implements GamePlugin {
       const gainedEnergy = newEnergy - agent.energy;
 
       await Promise.all([
-        db.consumeTree(treeId),
+        db.updateTreeAge(treeId, 0),
         db.updateAgent(agentId, { energy: newEnergy })
       ]);
 
       const planterName = tree.planted_by ? (await db.getAgent(tree.planted_by)).name : 'someone unknown';
 
       let combinedLog = moveResult.moveLog || '';
-      combinedLog += ` ${agent.name} then harvested the ripe fruits from a tree planted by ${planterName}, gaining ${gainedEnergy} satiation (satiation now ${newEnergy}). The tree is now cut down.`;
+      combinedLog += ` ${agent.name} then harvested the ripe fruits from a tree planted by ${planterName}, gaining ${gainedEnergy} satiation (satiation now ${newEnergy}). The tree has been reset to start growing again.`;
       
       return {
         success: true,
@@ -195,7 +212,7 @@ export class AgriculturePlugin implements GamePlugin {
     const gainedEnergy = newEnergy - agent.energy;
 
     await Promise.all([
-      db.consumeTree(treeId),
+      db.updateTreeAge(treeId, 0),
       db.updateAgent(agentId, { energy: newEnergy })
     ]);
 
@@ -203,7 +220,61 @@ export class AgriculturePlugin implements GamePlugin {
 
     return {
       success: true,
-      log: `${agent.name} harvested the ripe fruits from a tree planted by ${planterName}, gaining ${gainedEnergy} satiation (satiation now ${newEnergy}). The tree is now cut down.`
+      log: `${agent.name} harvested the ripe fruits from a tree planted by ${planterName}, gaining ${gainedEnergy} satiation (satiation now ${newEnergy}). The tree has been reset to start growing again.`
+    };
+  }
+
+  private async cutDownTree(agentId: number, treeId: string, db: DatabaseService): Promise<ActionResult> {
+    const [tree, agent] = await Promise.all([
+      db.getTree(treeId),
+      db.getAgent(agentId)
+    ]);
+
+    const distance = Math.hypot(tree.x_position - agent.x_position, tree.y_position - agent.y_position);
+    if (distance > 10) {
+      const moveResult = await this.attemptMoveToTarget(agentId, tree.x_position, tree.y_position, db);
+      
+      if (!moveResult.inRangeAfterMove) {
+        let combinedLog = moveResult.moveLog || '';
+        combinedLog += ` ${agent.name} tried to cut down a tree, but it was still too far away even after moving.`;
+        return {
+          success: false,
+          log: combinedLog
+        };
+      }
+      
+      const GOLD_REWARD = 5;
+      const newGold = (agent.gold || 0) + GOLD_REWARD;
+
+      await Promise.all([
+        db.deleteTree(treeId),
+        db.updateAgent(agentId, { gold: newGold })
+      ]);
+
+      const planterName = tree.planted_by ? (await db.getAgent(tree.planted_by)).name : 'someone unknown';
+
+      let combinedLog = moveResult.moveLog || '';
+      combinedLog += ` ${agent.name} then cut down a tree planted by ${planterName}, earning ${GOLD_REWARD} gold (gold now ${newGold}).`;
+      
+      return {
+        success: true,
+        log: combinedLog
+      };
+    }
+
+    const GOLD_REWARD = 5;
+    const newGold = (agent.gold || 0) + GOLD_REWARD;
+
+    await Promise.all([
+      db.deleteTree(treeId),
+      db.updateAgent(agentId, { gold: newGold })
+    ]);
+
+    const planterName = tree.planted_by ? (await db.getAgent(tree.planted_by)).name : 'someone unknown';
+
+    return {
+      success: true,
+      log: `${agent.name} cut down a tree planted by ${planterName}, earning ${GOLD_REWARD} gold (gold now ${newGold}).`
     };
   }
 

@@ -9,6 +9,7 @@ import { PlanningPlugin } from "./PlanningPlugin";
 import { AgriculturePlugin } from "./AgriculturePlugin";
 import { ReproductionPlugin } from "./ReproductionPlugin";
 import { TrustPlugin } from "./TrustPlugin";
+import { EconomyPlugin } from "./EconomyPlugin";
 
 let pluginManagerInstance: PluginManager | null = null;
 
@@ -33,4 +34,5 @@ function loadAllPlugins(): void {
   pluginManagerInstance.registerPlugin(new AgriculturePlugin());
   pluginManagerInstance.registerPlugin(new ReproductionPlugin());
   pluginManagerInstance.registerPlugin(new TrustPlugin());
+  pluginManagerInstance.registerPlugin(new EconomyPlugin());
 }

@@ -7,7 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // allows auto-instanciation with right options
+  // Allows to automatically instanciate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
@@ -113,6 +114,7 @@ export type Database = {
           created_at: string
           currently_being_processed: boolean
           energy: number
+          gold: number
           id: number
           name: string
           processed_at: string | null
@@ -125,6 +127,7 @@ export type Database = {
           created_at?: string
           currently_being_processed?: boolean
           energy?: number
+          gold?: number
           id?: number
           name?: string
           processed_at?: string | null
@@ -137,6 +140,7 @@ export type Database = {
           created_at?: string
           currently_being_processed?: boolean
           energy?: number
+          gold?: number
           id?: number
           name?: string
           processed_at?: string | null
@@ -268,6 +272,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      gold_chests: {
+        Row: {
+          created_at: string
+          id: string
+          x_position: number
+          y_position: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          x_position: number
+          y_position: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          x_position?: number
+          y_position?: number
+        }
+        Relationships: []
       }
       logs: {
         Row: {
